@@ -1,0 +1,4 @@
+- hosts: monitoring
+  remote_user: root
+  roles:
+    - nodejs

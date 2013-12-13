@@ -1,0 +1,2 @@
+graphite: { port: 2003, host: "127.0.0.1" }
+statsd: { port: 8125 }

@@ -1,0 +1,64 @@
+- name: Install tools
+  action: apt pkg={{ item.name }} state=installed
+  with_items: 
+  - { name: python-software-properties }
+  - { name: git }
+
+- name: Install dependencies for Graphite
+  action: apt pkg={{ item }}
+  with_items: [ memcached, python-dev, sqlite3, libcairo2, libcairo2-dev, python-cairo, pkg-config, apache2, libapache2-mod-wsgi ]
+    
+- name: Install Graphite pip requirements with version
+  action: pip name={{ item.name }} version={{ item.version }}
+  with_items:
+  - { name: django, version: 1.3 }
+  - { name: whisper, version: 0.9.9 }
+  - { name: carbon, version: 0.9.9 }
+  - { name: graphite-web, version: 0.9.9 }
+
+- name: Install Graphite pip requirements without version
+  action: pip name={{ item.name }} 
+  with_items:
+  - { name: python-memcached }
+  - { name: django-tagging }
+  - { name: twisted }
+
+- name: Graphite configuration
+  action: copy src={{ item }} dest=/opt/graphite/conf/{{ item }} 
+  with_items: [ carbon.conf, storage-schemas.conf ]
+
+- name: Graphite webapp log directory
+  action: file path=/opt/graphite/storage/log/webapp state=directory
+
+- name: Graphite webapp configuration
+  action: copy src=local_settings.py dest=/opt/graphite/webapp/graphite/local_settings.py
+
+- name: Graphite webapp syncdb
+  command: python /opt/graphite/webapp/graphite/manage.py syncdb creates=/opt/graphite/storage/graphite.db
+
+- name: Install statsd
+  action: git repo=git://github.com/etsy/statsd.git dest=/opt/statsd version=master
+
+- name: Statsd configuration
+  action: template src=localConfig.js.j2 dest=/opt/statsd/localConfig.js
+
+- name: Graphite vhost conf
+  action: copy src=graphite-vhost.conf dest=/etc/apache2/sites-available/graphite-vhost.conf
+  notify: restart apache
+
+- name: Graphite vhost symlink/enable
+  action: file src=/etc/apache2/sites-available/graphite-vhost.conf path=/etc/apache2/sites-enabled/000-default.conf state=link
+  notify: restart apache
+
+- name: Graphite wsgi 
+  action: copy src=graphite.wsgi dest=/opt/graphite/conf/graphite.wsgi
+
+- name: wsgi directory
+  action: file path=/etc/httpd/wsgi state=directory
+
+- name: Chown Graphite storage to Apache
+  action: file path=/opt/graphite/storage owner=www-data group=www-data
+
+- name: start Apache
+  service: name=apache2 state=started
+ 
